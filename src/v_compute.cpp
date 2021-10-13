@@ -17,6 +17,16 @@
 #include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <tf/transform_listener.h>
 
+#include <image_transport/image_transport.h>
+#include <cv_bridge/cv_bridge.h>
+#include <sensor_msgs/image_encodings.h>
+#include "opencv2/core/utility.hpp"
+#include "opencv2/video/tracking.hpp"
+#include "opencv2/imgproc.hpp"
+#include "opencv2/videoio.hpp"
+#include "opencv2/highgui.hpp"
+
+
 using namespace cv;
 using namespace std;
 using namespace Eigen;
@@ -62,6 +72,7 @@ public:
 	vs_based();
 	
 	Point3f rebuild3d(Point2f p, Eigen::Matrix<float, 1, 3> line, Eigen::Matrix3f Ksame, Eigen::Matrix3f Kdiff, Eigen::Matrix3f R, Eigen::Vector3f t);
+	Point3f rebuild3d_new(Point2f p, Mat depthimage,float uc,float vc,float fx, float fy);
 	Eigen::Matrix<float, 2, 3> comput_J(float fx, float fy, Point3f P);
 	Eigen::Matrix<float, 4, 6> comput_J_ba(Eigen::Matrix<float, 2, 3> Ji, Eigen::Matrix<float, 2, 3> Ji_1);
 	
@@ -116,6 +127,16 @@ Point3f vs_based::rebuild3d(Point2f p, Eigen::Matrix<float, 1, 3> line, Eigen::M
 	result.x = result_v(0, 0);
 	result.y = result_v(1, 0);
 	result.z = result_v(2, 0);
+	return result;
+}
+
+Point3f vs_based::rebuild3d_new(Point2f p, Mat depthimage,float uc,float vc,float fx, float fy) {
+	Point3f result;
+	float depth = depthimage.at<float>(p.y,p.x);
+	result.x = (p.x - uc) * depth / fx;
+	result.y = (p.y - vc) * depth / fy;
+	result.z = depth;
+
 	return result;
 }
 
@@ -220,8 +241,8 @@ Eigen::Matrix<float, 4, 6> vs_based::compute_Hc(float fcx, float fcy, Point3f Pc
 	Eigen::Matrix<float, 6, 6> Wc;
 	Wc = this->comput_W(Rb2c, tb2c);
 	Eigen::Matrix<float, 4, 6> result;
-	result = J_ba * M_ba * Qc * Wc;
-    //result = J_ba * M_ba ;
+	//result = J_ba * M_ba * Qc * Wc;
+    result = J_ba * M_ba ;
 	
 	cout<<"jacobian j:"<<endl<<J_ba * M_ba<<endl;
 	cout<<"Wc"<<endl<<Wc<<endl;
@@ -268,6 +289,39 @@ void vs_callback(const vs_nan::vs_message& vs_msg){
 	P3_for_error=Point2f(vs_msg.rg_P3_x_for_error,vs_msg.rg_P3_y_for_error);
 	P4_for_error=Point2f(vs_msg.rg_P4_x_for_error,vs_msg.rg_P4_y_for_error);
 }
+Mat depth_left;
+Mat depth_right;
+void cam_left_depth_callback(const sensor_msgs::ImageConstPtr &msg)
+{
+	cv_bridge::CvImagePtr cvPtr;
+	try
+	{
+		cvPtr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_32FC1);
+	}
+	catch (cv_bridge::Exception &e)
+	{
+		ROS_ERROR("cv_bridge exception: %s", e.what());
+		return;
+	}
+	depth_left = cvPtr->image.clone();
+	return;
+}
+void cam_right_depth_callback(const sensor_msgs::ImageConstPtr &msg)
+{
+	cv_bridge::CvImagePtr cvPtr;
+	try
+	{
+		cvPtr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_32FC1);
+	}
+	catch (cv_bridge::Exception &e)
+	{
+		ROS_ERROR("cv_bridge exception: %s", e.what());
+		return;
+	}
+	depth_right = cvPtr->image.clone();
+	return;
+}
+
 
 //单位m 
 int main(int argc, char** argv)
@@ -307,7 +361,11 @@ Tt2rg<<
     ros::NodeHandle nh;
     ros::Subscriber sub = nh.subscribe("vs_topic",1,vs_callback);
 
-
+    image_transport::ImageTransport it_(nh);
+	image_transport::Subscriber Sub_left;
+	image_transport::Subscriber Sub_right;
+	Sub_left= it_.subscribe("camera1/depth/image_raw1", 1, cam_left_depth_callback); 
+	Sub_right= it_.subscribe("camera2/depth/image_raw2", 1, cam_right_depth_callback); 
 	vs_nan::floatlist velocity;
  	ros::Publisher pub = nh.advertise<vs_nan::floatlist>("ur5_end_velocities",1);
 
@@ -330,10 +388,16 @@ Tt2rg<<
 		ros::spinOnce();
 		//3D重建
 		
-		source.lf_P1=source.rebuild3d(source.lf_img_pt1,source.rg_line_4,source.K_lf,source.K_rg,source.Rl2r,source.tl2r);
-		source.lf_P2=source.rebuild3d(source.lf_img_pt2,source.rg_line_3,source.K_lf,source.K_rg,source.Rl2r,source.tl2r);
-		source.rg_P3=source.rebuild3d(source.rg_img_pt3,source.lf_line_2,source.K_rg,source.K_lf,source.Rl2r.inverse(),-source.Rl2r.inverse()*source.tl2r);
-		source.rg_P4=source.rebuild3d(source.rg_img_pt4,source.lf_line_1,source.K_rg,source.K_lf,source.Rl2r.inverse(),-source.Rl2r.inverse()*source.tl2r);
+		// source.lf_P1=source.rebuild3d(source.lf_img_pt1,source.rg_line_4,source.K_lf,source.K_rg,source.Rl2r,source.tl2r);
+		// source.lf_P2=source.rebuild3d(source.lf_img_pt2,source.rg_line_3,source.K_lf,source.K_rg,source.Rl2r,source.tl2r);
+		// source.rg_P3=source.rebuild3d(source.rg_img_pt3,source.lf_line_2,source.K_rg,source.K_lf,source.Rl2r.inverse(),-source.Rl2r.inverse()*source.tl2r);
+		// source.rg_P4=source.rebuild3d(source.rg_img_pt4,source.lf_line_1,source.K_rg,source.K_lf,source.Rl2r.inverse(),-source.Rl2r.inverse()*source.tl2r);
+		
+		source.lf_P1=source.rebuild3d_new(source.lf_img_pt1,depth_left,640,512,3629.6187,3629.6187);
+		source.lf_P2=source.rebuild3d_new(source.lf_img_pt2,depth_left,640,512,3629.6187,3629.6187);
+		source.rg_P3=source.rebuild3d_new(source.rg_img_pt3,depth_right,640,512,3629.6187,3629.6187);
+		source.rg_P4=source.rebuild3d_new(source.rg_img_pt4,depth_right,640,512,3629.6187,3629.6187);
+		
 		cout<<"The result of rebuild:"<<endl;
 		cout<<"lf_P1:"<<source.lf_P1.x<<","<<source.lf_P1.y<<","<<source.lf_P1.z<<endl;
 		cout<<"lf_P2:"<<source.lf_P2.x<<","<<source.lf_P2.y<<","<<source.lf_P2.z<<endl;
@@ -445,7 +509,7 @@ Tt2rg<<
 		cout<<"H_pinv"<<H_Diag<<endl;
 		u = -H_Diag.inverse()*Ht*error;
 		u=u/100;
-		u(5,0) = -u(5,0);
+		//u(5,0) = -u(5,0);
 
 
 

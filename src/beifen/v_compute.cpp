@@ -17,16 +17,6 @@
 #include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <tf/transform_listener.h>
 
-#include <image_transport/image_transport.h>
-#include <cv_bridge/cv_bridge.h>
-#include <sensor_msgs/image_encodings.h>
-#include "opencv2/core/utility.hpp"
-#include "opencv2/video/tracking.hpp"
-#include "opencv2/imgproc.hpp"
-#include "opencv2/videoio.hpp"
-#include "opencv2/highgui.hpp"
-
-
 using namespace cv;
 using namespace std;
 using namespace Eigen;
@@ -72,7 +62,6 @@ public:
 	vs_based();
 	
 	Point3f rebuild3d(Point2f p, Eigen::Matrix<float, 1, 3> line, Eigen::Matrix3f Ksame, Eigen::Matrix3f Kdiff, Eigen::Matrix3f R, Eigen::Vector3f t);
-	Point3f rebuild3d_new(Point2f p, Mat depthimage,float uc,float vc,float fx, float fy);
 	Eigen::Matrix<float, 2, 3> comput_J(float fx, float fy, Point3f P);
 	Eigen::Matrix<float, 4, 6> comput_J_ba(Eigen::Matrix<float, 2, 3> Ji, Eigen::Matrix<float, 2, 3> Ji_1);
 	
@@ -81,8 +70,6 @@ public:
 	Eigen::Matrix<float, 6, 6> comput_Q(Eigen::Vector3f rt2c);
 	Eigen::Matrix<float, 6, 6> comput_W(Eigen::Matrix<float, 3, 3> Rb2c, Eigen::Vector3f tb2c);
 	//计算Hc
-	Point3f convertR2L(Point3f p, Eigen::Matrix<float, 3, 3> Rt2c, Eigen::Vector3f rt2c);
-	Point2f convertImagePlane(Point3f p);
 	Eigen::Matrix<float, 4, 6> compute_Hc(float fcx, float fcy, Point3f Pc, Point3f Pc_1, Eigen::Matrix<float, 3, 1> rt2c, Eigen::Matrix<float, 3, 3> Rb2c, Eigen::Vector3f tb2c);
 };
 
@@ -99,13 +86,13 @@ vs_based::vs_based()
 	//左相机内参
 	//640 512 f3629.62
 	this->K_lf <<
-		3629.6187, 0, 640,
-		0, 3629.6187, 512   , 
+		3629.6187, 0, 640.5,
+		0, 3629.6187, 512.5   , 
 		0, 0, 1;
 	//右相机内参
 	this->K_rg <<
-		3629.6187, 0, 640,
-		0, 3629.6187, 512   , 
+		3629.6187, 0, 640.5,
+		0, 3629.6187, 512.5   , 
 		0, 0, 1;
 	this->fx_lf = this->K_lf(0, 0);
 	this->fy_lf = this->K_lf(1, 1);
@@ -132,16 +119,6 @@ Point3f vs_based::rebuild3d(Point2f p, Eigen::Matrix<float, 1, 3> line, Eigen::M
 	return result;
 }
 
-Point3f vs_based::rebuild3d_new(Point2f p, Mat depthimage,float uc,float vc,float fx, float fy) {
-	Point3f result;
-	float depth = depthimage.at<float>(p.y,p.x);
-	result.x = (p.x - uc) * depth / fx;
-	result.y = (p.y - vc) * depth / fy;
-	result.z = depth;
-
-	return result;
-}
-
 //计算J
 Eigen::Matrix<float, 4, 6> vs_based::comput_J_ba(Eigen::Matrix<float, 2, 3> Ji, Eigen::Matrix<float, 2, 3>Ji_1)
 {
@@ -161,7 +138,7 @@ Eigen::Matrix<float, 2, 3> vs_based::comput_J(float fx, float fy, Point3f P)
 	result(0, 2) = -fx * P.x / (P.z * P.z);
 
 	result(1, 1) = fy / P.z;
-	result(1, 2) = -fy * P.y / (P.z * P.z);
+	result(0, 2) = -fy * P.y / (P.z * P.z);
 	//cout<<"J"<<result<<endl;
 	return result;
 }
@@ -243,9 +220,7 @@ Eigen::Matrix<float, 4, 6> vs_based::compute_Hc(float fcx, float fcy, Point3f Pc
 	Eigen::Matrix<float, 6, 6> Wc;
 	Wc = this->comput_W(Rb2c, tb2c);
 	Eigen::Matrix<float, 4, 6> result;
-	//result = J_ba * M_ba * Qc * Wc;
-    result = J_ba * M_ba * Qc ;
-	
+	result = J_ba * M_ba * Qc * Wc;
 	cout<<"jacobian j:"<<endl<<J_ba * M_ba<<endl;
 	cout<<"Wc"<<endl<<Wc<<endl;
 	return result;
@@ -291,54 +266,6 @@ void vs_callback(const vs_nan::vs_message& vs_msg){
 	P3_for_error=Point2f(vs_msg.rg_P3_x_for_error,vs_msg.rg_P3_y_for_error);
 	P4_for_error=Point2f(vs_msg.rg_P4_x_for_error,vs_msg.rg_P4_y_for_error);
 }
-Mat depth_left;
-Mat depth_right;
-void cam_left_depth_callback(const sensor_msgs::ImageConstPtr &msg)
-{
-	cv_bridge::CvImagePtr cvPtr;
-	try
-	{
-		cvPtr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_32FC1);
-	}
-	catch (cv_bridge::Exception &e)
-	{
-		ROS_ERROR("cv_bridge exception: %s", e.what());
-		return;
-	}
-	depth_left = cvPtr->image.clone();
-	return;
-}
-void cam_right_depth_callback(const sensor_msgs::ImageConstPtr &msg)
-{
-	cv_bridge::CvImagePtr cvPtr;
-	try
-	{
-		cvPtr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_32FC1);
-	}
-	catch (cv_bridge::Exception &e)
-	{
-		ROS_ERROR("cv_bridge exception: %s", e.what());
-		return;
-	}
-	depth_right = cvPtr->image.clone();
-	return;
-}
-
-Point3f vs_based::convertR2L(Point3f p, Eigen::Matrix<float, 3, 3> Rt2c, Eigen::Vector3f rt2c){
-	//Point3f result;
-	Eigen::Vector3f result;
-	Eigen::Vector3f p_v(p.x, p.y, p.z);
-	result = Rt2c * p_v + rt2c;
-	return Point3f(result(0,0), result(1,0), result(2,0));
-}
-Point2f vs_based::convertImagePlane(Point3f p){
-	Point2f result;
-	result.x = (3629.6187 * p.x)/ p.z + 640;
-	result.y = (3629.6187 * p.y)/ p.z + 512;
-	return result;
-
-}
-
 
 //单位m 
 int main(int argc, char** argv)
@@ -372,17 +299,10 @@ Tt2rg<<
   0.34202,         0,  0.939693,        0.010,
         0,         0,         0,         1;
 
-		cout<<Tt2lf.inverse() * Tt2rg<<endl;
-
     ros::init(argc, argv, "v_compute");//节点名字
     ros::NodeHandle nh;
     ros::Subscriber sub = nh.subscribe("vs_topic",1,vs_callback);
 
-    image_transport::ImageTransport it_(nh);
-	image_transport::Subscriber Sub_left;
-	image_transport::Subscriber Sub_right;
-	Sub_left= it_.subscribe("camera1/depth/image_raw1", 1, cam_left_depth_callback); 
-	Sub_right= it_.subscribe("camera2/depth/image_raw2", 1, cam_right_depth_callback); 
 	vs_nan::floatlist velocity;
  	ros::Publisher pub = nh.advertise<vs_nan::floatlist>("ur5_end_velocities",1);
 
@@ -405,112 +325,11 @@ Tt2rg<<
 		ros::spinOnce();
 		//3D重建
 		
-		// source.lf_P1=source.rebuild3d(source.lf_img_pt1,source.rg_line_4,source.K_lf,source.K_rg,source.Rl2r,source.tl2r);
-		// source.lf_P2=source.rebuild3d(source.lf_img_pt2,source.rg_line_3,source.K_lf,source.K_rg,source.Rl2r,source.tl2r);
-		// source.rg_P3=source.rebuild3d(source.rg_img_pt3,source.lf_line_2,source.K_rg,source.K_lf,source.Rl2r.inverse(),-source.Rl2r.inverse()*source.tl2r);
-		// source.rg_P4=source.rebuild3d(source.rg_img_pt4,source.lf_line_1,source.K_rg,source.K_lf,source.Rl2r.inverse(),-source.Rl2r.inverse()*source.tl2r);
-		
-		source.lf_P1=source.rebuild3d_new(source.lf_img_pt1,depth_left,640,512,3629.6187,3629.6187);
-		source.lf_P2=source.rebuild3d_new(source.lf_img_pt2,depth_left,640,512,3629.6187,3629.6187);
-		source.rg_P3=source.rebuild3d_new(source.rg_img_pt3,depth_right,640,512,3629.6187,3629.6187);
-		source.rg_P4=source.rebuild3d_new(source.rg_img_pt4,depth_right,640,512,3629.6187,3629.6187);
-
-
-
-		//将左边点变换到我们认为的末端平面上
-		source.lf_P1 = source.convertR2L(source.lf_P1, Tt2lf.block<3,3>(0,0),source.rt2lf);
-		source.lf_P2 = source.convertR2L(source.lf_P1, Tt2lf.block<3,3>(0,0),source.rt2lf);
-		//将右边点变换到我们认为的末端平面上
-		source.rg_P3 = source.convertR2L(source.rg_P3, Tt2rg.block<3,3>(0,0),source.rt2rg);
-		source.rg_P4 = source.convertR2L(source.rg_P4, Tt2rg.block<3,3>(0,0),source.rt2rg);
-
-		cout<<"The result of rebuild in fake end-effector:"<<endl;
-		cout<<"lf_P1:"<<source.lf_P1.x<<","<<source.lf_P1.y<<","<<source.lf_P1.z<<endl;
-		cout<<"lf_P2:"<<source.lf_P2.x<<","<<source.lf_P2.y<<","<<source.lf_P2.z<<endl;
-		cout<<"rg_P3:"<<source.rg_P3.x<<","<<source.rg_P3.y<<","<<source.rg_P3.z<<endl;
-		cout<<"rg_P4:"<<source.rg_P4.x<<","<<source.rg_P4.y<<","<<source.rg_P4.z<<endl;
-		//等价的图像pixel点
-
-		Point2f rightPixend1 = source.convertImagePlane(source.lf_P1);
-		Point2f rightPixend2 = source.convertImagePlane(source.lf_P2);
-		P1_for_error = rightPixend1;
-        P2_for_error = rightPixend2;
-		Point2f rightPixend3 = source.convertImagePlane(source.rg_P3);
-		Point2f rightPixend4 = source.convertImagePlane(source.rg_P4);
-		P3_for_error = rightPixend3;
-        P4_for_error = rightPixend4;
-		cout<<"对应的图像平面点为："<<endl;
-		cout<<"lf_:"<<P1_for_error.x<<","<<P1_for_error.y<<endl;
-		cout<<"lf_:"<<P2_for_error.x<<","<<P2_for_error.y<<endl;
-		cout<<"rg_:"<<P3_for_error.x<<","<<P3_for_error.y<<endl;
-		cout<<"rg_:"<<P4_for_error.x<<","<<P4_for_error.y<<endl;
-		//重建期望点
-		Point3f rebuild_desiredp1;
-		Point3f rebuild_desiredp2;
-		Point3f rebuild_desiredp3;
-		Point3f rebuild_desiredp4;
-
-		rebuild_desiredp1 = source.rebuild3d_new(Point2f(973.662, 241.07),depth_left,640,512,3629.6187,3629.6187);
-		rebuild_desiredp2 = source.rebuild3d_new(Point2f(973.667, 781.999),depth_left,640,512,3629.6187,3629.6187);
-		rebuild_desiredp3 = source.rebuild3d_new(Point2f(305.331, 781.95),depth_right,640,512,3629.6187,3629.6187);
-		rebuild_desiredp4 = source.rebuild3d_new(Point2f(305.333, 241),depth_right,640,512,3629.6187,3629.6187);
-		rebuild_desiredp1.z = 0.211;
-		rebuild_desiredp2.z = 0.211;
-		rebuild_desiredp3.z = 0.211;
-		rebuild_desiredp4.z = 0.211;
-		cout<<"期望点的相机坐标系下的重建值："<<endl;
-		cout<<rebuild_desiredp1.x<<" "<<rebuild_desiredp1.y<<" "<<rebuild_desiredp1.z<<endl;
-		cout<<rebuild_desiredp2.x<<" "<<rebuild_desiredp2.y<<" "<<rebuild_desiredp2.z<<endl;
-		cout<<rebuild_desiredp3.x<<" "<<rebuild_desiredp3.y<<" "<<rebuild_desiredp3.z<<endl;
-		cout<<rebuild_desiredp4.x<<" "<<rebuild_desiredp4.y<<" "<<rebuild_desiredp4.z<<endl;
-
-		rebuild_desiredp1 = source.convertR2L(rebuild_desiredp1, Tt2lf.block<3,3>(0,0),source.rt2lf);
-		rebuild_desiredp2 = source.convertR2L(rebuild_desiredp2, Tt2lf.block<3,3>(0,0),source.rt2lf);	
-		rebuild_desiredp3 = source.convertR2L(rebuild_desiredp3, Tt2rg.block<3,3>(0,0),source.rt2rg);
-		rebuild_desiredp4 = source.convertR2L(rebuild_desiredp4, Tt2rg.block<3,3>(0,0),source.rt2rg);
-
-		cout<<"期望点转至末端的重建值："<<endl<<rebuild_desiredp1.x<<" "<<rebuild_desiredp1.y<<" "<<rebuild_desiredp1.z<<endl;
-		cout<<rebuild_desiredp2.x<<" "<<rebuild_desiredp2.y<<" "<<rebuild_desiredp2.z<<endl<<rebuild_desiredp3.x<<" "<<rebuild_desiredp3.y<<" "<<rebuild_desiredp3.z<<endl;
-		cout<<rebuild_desiredp4.x<<" "<<rebuild_desiredp4.y<<" "<<rebuild_desiredp4.z<<endl;
-
-		Point2f desiredp1end = source.convertImagePlane(rebuild_desiredp1);
-		Point2f desiredp2end = source.convertImagePlane(rebuild_desiredp2);
-		Point2f desiredp3end = source.convertImagePlane(rebuild_desiredp3);
-		Point2f desiredp4end = source.convertImagePlane(rebuild_desiredp4);
-		dev_p1 = desiredp1end;
-		dev_p2 = desiredp2end;
-		dev_p3 = desiredp3end;
-		dev_p4 = desiredp4end;
-		cout<<"末端图像平面的当前点和期望点"<<endl;
-		cout<<"[ "<<P1_for_error.x<<", "<<P1_for_error.y<<"]"<<endl; 
-		cout<<"[ "<<P2_for_error.x<<", "<<P2_for_error.y<<"]"<<endl; 
-		cout<<"[ "<<P3_for_error.x<<", "<<P3_for_error.y<<"]"<<endl; 
-		cout<<"[ "<<P4_for_error.x<<", "<<P4_for_error.y<<"]"<<endl; 
-		cout<<"[ "<<dev_p1.x<<", "<<dev_p1.y<<"]"<<endl; 
-		cout<<"[ "<<dev_p2.x<<", "<<dev_p2.y<<"]"<<endl; 
-		cout<<"[ "<<dev_p3.x<<", "<<dev_p3.y<<"]"<<endl; 
-		cout<<"[ "<<dev_p4.x<<", "<<dev_p4.y<<"]"<<endl; 
-
-		Mat rebuildplane = Mat(1536, 1920, CV_8UC3, Scalar(255,255,255));
-		circle(rebuildplane, P1_for_error, 15,Scalar(255,0,0),-1);
-		circle(rebuildplane, P2_for_error, 7,Scalar(0,0,255),-1);
-		circle(rebuildplane, P3_for_error, 9,Scalar(0,0,255),-1);
-		circle(rebuildplane, P4_for_error, 11,Scalar(255,0,0),-1);
-		circle(rebuildplane, dev_p1, 15,Scalar(0,255,0),-1);
-		circle(rebuildplane, dev_p2, 7,Scalar(0,255,0),-1);
-		circle(rebuildplane, dev_p3, 9,Scalar(0,255,0),-1);
-		circle(rebuildplane, dev_p4, 11,Scalar(0,255,0),-1);
-
-		namedWindow("rebuild_image_plane", 0);
-		resizeWindow("rebuild_image_plane", 640, 512);
-		imshow("rebuild_image_plane",  rebuildplane);
-		waitKey(25);
-		
-
-		//
-
-
-		cout<<"The result of rebuild: after converted"<<endl;
+		source.lf_P1=source.rebuild3d(source.lf_img_pt1,source.rg_line_4,source.K_lf,source.K_rg,source.Rl2r,source.tl2r);
+		source.lf_P2=source.rebuild3d(source.lf_img_pt2,source.rg_line_3,source.K_lf,source.K_rg,source.Rl2r,source.tl2r);
+		source.rg_P3=source.rebuild3d(source.rg_img_pt3,source.lf_line_2,source.K_rg,source.K_lf,source.Rl2r.inverse(),-source.Rl2r.inverse()*source.tl2r);
+		source.rg_P4=source.rebuild3d(source.rg_img_pt4,source.lf_line_1,source.K_rg,source.K_lf,source.Rl2r.inverse(),-source.Rl2r.inverse()*source.tl2r);
+		cout<<"The result of rebuild:"<<endl;
 		cout<<"lf_P1:"<<source.lf_P1.x<<","<<source.lf_P1.y<<","<<source.lf_P1.z<<endl;
 		cout<<"lf_P2:"<<source.lf_P2.x<<","<<source.lf_P2.y<<","<<source.lf_P2.z<<endl;
 		cout<<"rg_P3:"<<source.rg_P3.x<<","<<source.rg_P3.y<<","<<source.rg_P3.z<<endl;
@@ -557,25 +376,42 @@ Tt2rg<<
         T_transform.block<3,3>(0,0)=T_rotation.cast<float>();
 
 		// 机械臂读到的 +机械臂的坐标系转换+熟悉的末端到相机
-        Tb2lf=T*T_transform;//*Tt2lf;
-        Tb2rg=T*T_transform;//*Tt2rg;
+        Tb2lf=T*T_transform*Tt2lf;
+        Tb2rg=T*T_transform*Tt2rg;
         //cout<< "left pose"<<Tb2lf<<endl;
         //cout<< "right pose"<<Tb2rg<<endl;		
         source.Rb2rg=Tb2rg.block<3, 3>(0, 0);
 	    source.tb2rg=Tb2rg.block<3,1>(0,3);
 		//读取当前相机的位置
         source.Rb2lf=Tb2lf.block<3, 3>(0, 0);
-	    source.tb2lf=Tb2lf.block<3, 1>(0, 3);
+	    source.tb2lf=Tb2lf.block<3, 1>(0, 3);;
 
 		
 		//Hr=source.compute_Hc(source.fx_rg,source.fy_rg,source.rg_P3,source.rg_P4,source.rt2rg,source.Rb2rg,source.tb2rg);
-		Hr=source.compute_Hc(source.fx_rg,source.fy_rg,source.rg_P3,source.rg_P4,Eigen::Matrix<float, 3, 1>(0,0,0),source.Rb2lf.transpose(),source.tb2lf);
+		Hr=source.compute_Hc(source.fx_rg,source.fy_rg,source.rg_P3,source.rg_P4,-Tt2rg.block<3,3>(0,0).transpose()*source.rt2rg,source.Rb2rg.transpose(),-source.tb2rg);
 		cout<<"Hr"<<Hr<<endl;
 		Hr=Hr/100;
-		cout<<"H_in left"<<Hr<<endl;
-		Hl=source.compute_Hc(source.fx_lf,source.fy_lf,source.lf_P1,source.lf_P2,Eigen::Matrix<float, 3, 1>(0,0,0),source.Rb2lf.transpose(),source.tb2lf);
+		cout<<"Hr"<<Hr<<endl;
+		Hl=source.compute_Hc(source.fx_lf,source.fy_lf,source.lf_P1,source.lf_P2,-Tt2lf.block<3,3>(0,0).transpose()*source.rt2lf,source.Rb2lf.transpose(),-source.tb2lf);
 		Hl=Hl/100;
 
+		Eigen::Matrix<float,4,1>error_rg,error_lf;
+
+		// error_rg(0,0)=P3_for_error.x-dev_p3.x;
+		// error_rg(1,0)=P3_for_error.y-dev_p3.y;
+		// error_rg(2,0)=P4_for_error.x-dev_p4.x;
+		// error_rg(3,0)=P4_for_error.y-dev_p4.y;
+
+		// error_lf(0,0)=P1_for_error.x-dev_p1.x;
+		// error_lf(1,0)=P1_for_error.y-dev_p1.y;
+		// error_lf(2,0)=P2_for_error.x-dev_p2.x;
+		// error_lf(3,0)=P2_for_error.y-dev_p2.y;
+		//计算末端速度
+		// cout<<"error:"<<endl;
+		// cout<<"____right cam_____"<<endl;
+		// cout<<error_rg<<endl;
+		// cout<<"____left  cam_____"<<endl;
+		// cout<<error_lf<<endl;
 
 		Eigen::Matrix<float,6,1> u;
 		//方法1 386-408
@@ -588,13 +424,6 @@ Tt2rg<<
 		error(5,0)=P1_for_error.y-dev_p1.y;
 		error(6,0)=P2_for_error.x-dev_p2.x;
 		error(7,0)=P2_for_error.y-dev_p2.y;
-		cout<<"error"<<endl<<error<<endl;
-
-		cout<<P1_for_error.x<<endl;cout<<P1_for_error.y<<endl;cout<<P2_for_error.x<<endl;cout<<P2_for_error.y<<endl;
-		cout<<P3_for_error.x<<endl;cout<<P3_for_error.y<<endl;cout<<P4_for_error.x<<endl;cout<<P4_for_error.y<<endl;
-		cout<<dev_p1.x<<endl;cout<<dev_p1.y<<endl;cout<<dev_p2.x<<endl;cout<<dev_p2.y<<endl;
-		cout<<dev_p3.x<<endl;cout<<dev_p3.y<<endl;cout<<dev_p4.x<<endl;cout<<dev_p4.y<<endl;
-
 		Eigen::Matrix<float, 8, 6> H;
 		H.setZero();
 		H.block<4, 6>(0, 0) = Hr;
@@ -609,29 +438,78 @@ Tt2rg<<
 		H_Diag=0.3*H_Diag+(Ht*H);
 		
 		cout<<"H_pinv"<<H_Diag<<endl;
-		u = -H_Diag.inverse()*Ht*error;
-		u=u/350;
+		u = H_Diag.inverse()*Ht*error;
+		u=-u/100;
+		cout<<"gailemei a "<<endl;
 
-		cout<<"在相机中的工具速度是"<<endl;
-		cout<<u<<endl;
-		Matrix<float, 6,6> Tb2c;
-		Tb2c.setZero();
-		Tb2c.block<3,3>(0,0) = source.Rb2lf;
-		Tb2c.block<3,3>(3,3) = source.Rb2lf;
-		Point3f p1 = Point3f(source.tb2lf(0,0), source.tb2lf(1,0), source.tb2lf(2,0));
-		cout<<"the original b2c translation"<<p1<<endl;
-        //Tb2c.block<3,3>(0,3) = sk(p1) * source.Rb2lf;
-		//Matrix<float ,3 ,3> m = source.Rb2lf * sk(p1) ;
-		//Tb2c.block<3,3>(0,3) = source.Rb2lf * sk(p1);
-		cout<<"转换矩阵为"<<Tb2c<<endl;
-		//cout<<"11"<<endl<<m<<endl;
-		u = Tb2c * u;
-\
 
-		u(3,0) = 26 * u(3,0);
-		u(4,0) = 26 * u(4,0);
-		u(5,0) = 26 * u(5,0);
 
+
+		//论文中的方法3////论文中的方法////论文中的方法////论文中的方法////论文中的方法////论文中的方法////论文中的方法////论文中的方法////论文中的方法////论文中的方法//
+		// Eigen::Matrix<float,6,6>P;
+		// Eigen::Matrix<float,6,6> I =MatrixXd::Identity(6, 6).cast<float>();
+		// if(sqrt(double(pow(error_rg(0,0),2)+pow(error_rg(1,0),2)+pow(error_rg(2,0),2)+pow(error_rg(3,0),2)))>=25
+		// 		|| sqrt(double(pow(error_lf(0,0),2)+pow(error_lf(1,0),2)+pow(error_lf(2,0),2)+pow(error_lf(3,0),2)))>=25)
+		// {
+		// 	//Hl=source.compute_Hc(source.fx_lf,source.fy_lf,source.lf_P1,source.lf_P2,-source.rt2lf,source.Rb2lf,source.tb2lf);
+		// 	//Hl=Hl/100;
+			
+		// 	P=I-Hr.transpose()*(Hr*Hr.transpose()).inverse()*Hr;
+		// 	u=-0.3*Hr.transpose()*(Hr*Hr.transpose()).inverse()*error_rg
+		// 		+P*(Hl*P).transpose()*((Hl*P)*(Hl*P).transpose()).inverse()*(-0.3*error_lf-Hl*Hr.transpose()*(Hr*Hr.transpose()).inverse()
+		// 		*(-0.3*error_rg));
+		// 	u=u/100;
+
+		// }
+		// else
+		// {
+		// 	 	Matrix<float,6,1> zero =MatrixXd::Zero(6, 1).cast<float>();
+		// 	 	u=zero;
+		// }
+
+		//论文中的方法////论文中的方法////论文中的方法////论文中的方法////论文中的方法////论文中的方法////论文中的方法////论文中的方法////论文中的方法////论文中的方法//
+
+
+		//第二种方法
+		//右边的误差和>3          
+		// if(sqrt(double(pow(error_rg(0,0),2)+pow(error_rg(1,0),2)+pow(error_rg(2,0),2)+pow(error_rg(3,0),2)))>25)
+		// {
+
+		// 	MatrixXf Hr_Diag((Hr*Hr.transpose()).diagonal().asDiagonal());
+		// 	 cout<<"Hr_Diag"<<Hr_Diag<<endl;
+		// 	Hr_Diag=3*Hr_Diag+Hr*Hr.transpose();
+		// 	u = Hr.transpose()*Hr_Diag.inverse()*error_rg;
+		// 	//u=0.3*Hr.transpose()*(Hr*Hr.transpose()).inverse()*error_rg;
+		// 	u=u/100;
+			
+		// 	// cout<<"机械臂末端运动速度"<<u.transpose()<<endl;
+		// 	// cout<<(Hr*Hr.transpose()).inverse()<<endl;
+		// }//右边的误差和<=3 左边的>3
+		// else if(sqrt(double(pow(error_rg(0,0),2)+pow(error_rg(1,0),2)+pow(error_rg(2,0),2)+pow(error_rg(3,0),2)))<=25&&
+		// sqrt(double(pow(error_lf(0,0),2)+pow(error_lf(1,0),2)+pow(error_lf(2,0),2)+pow(error_lf(3,0),2)))>3
+		// )
+		// {	
+		// 	Eigen::Matrix<float,6,6>P;
+		// 	Eigen::Matrix<float,6,6> I =MatrixXd::Identity(6, 6).cast<float>();
+		// 	P=I-Hr.transpose()*(Hr*Hr.transpose()).inverse()*Hr;
+
+		// 	// Hl=source.compute_Hc(source.fx_lf,source.fy_lf,source.lf_P1,source.lf_P2,-source.rt2lf,source.Rb2lf,source.tb2lf);
+		// 	// Hl=Hl/100;
+		// 	u=-0.3*P*(Hl*P).transpose()*((Hl*P)*(Hl*P).transpose()).inverse()*error_lf;
+		// 	u=u/100;
+		// 	cout<<"机械臂末端运动速度"<<u.transpose()<<endl;
+		// }//左右都<3 完成
+		// else if(sqrt(double(pow(error_rg(0,0),2)+pow(error_rg(1,0),2)+pow(error_rg(2,0),2)+pow(error_rg(3,0),2)))<=3&&
+		// sqrt(double(pow(error_lf(0,0),2)+pow(error_lf(1,0),2)+pow(error_lf(2,0),2)+pow(error_lf(3,0),2)))<=3)
+		// {
+		// 	Matrix<float,6,1> zero =MatrixXd::Zero(6, 1).cast<float>();
+		// 	u=zero;
+		// }
+		// else{
+		// 	Matrix<float,6,1> zero =MatrixXd::Zero(6, 1).cast<float>();
+		// 	u=zero;
+		// }
+			
 		//发送 u
 		cout<<"速度是"<<endl;
 		cout<<u<<endl;

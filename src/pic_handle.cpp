@@ -113,7 +113,8 @@ void CaculatePoint(Point2f& GreenPoint,float * Line,float length,int flag,Point2
             newline[i]=-newline[i];
         }
     }
-
+// cout<<"111111111111:"<<length*newline[1]/sqrtf(powf(newline[0], 2)+powf(newline[1], 2))<<endl;
+// cout<<"222222222222:"<<length*newline[0]/sqrtf(powf(newline[0], 2)+powf(newline[1], 2))<<endl;
     TargetPoint.x=GreenPoint.x+length*newline[1]/sqrtf(powf(newline[0], 2)+powf(newline[1], 2));
     TargetPoint.y=GreenPoint.y+length*newline[0]/sqrtf(powf(newline[0], 2)+powf(newline[1], 2));
 
@@ -160,7 +161,8 @@ void CaculateTargetPoint(Mat& img,Point2f &up_point,Point2f &down_point,float le
     float line_1[3];
     CaculateLine(circle_point1, circle_point2 ,line_1);
     
-
+    cout<<"abcdefg"<<endl;
+    cout<<circle_point1<<endl<<circle_point2;
     CaculatePoint(circle_point1,line_1,length,flag,up_point);
     CaculatePoint(circle_point2,line_1,length,flag,down_point);
 

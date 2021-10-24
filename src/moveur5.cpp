@@ -16,6 +16,7 @@ int main(int argc, char** argv)
 {
     //double pt1[3]={-0.60,-0.00,0.31};//XYZ
     double pt1[3]={-0.63865,0.0020246,0.3102};//XYZ
+    //double pt1[3]={-0.60,0,0.286};//XYZ
 
     ros::init(argc, argv, "move_group_interface_demo", ros::init_options::AnonymousName);
     
@@ -43,7 +44,8 @@ int main(int argc, char** argv)
     target_pose.position.z = org_z;
 
     //Eigen::Vector3d ea(0-PI/122,PI/2,PI/2+PI/12);
-    Eigen::Vector3d ea(0-PI/122,PI/2-PI/20,PI/2+PI/12);
+    Eigen::Vector3d ea(0-PI/122,PI/2-PI/20,PI/2+PI/8);
+    //Eigen::Vector3d ea(0,PI/2,PI/2);
 
     Eigen::Quaterniond quaternion3;
     quaternion3 = Eigen::AngleAxisd(ea[0], Eigen::Vector3d::UnitZ()) * 

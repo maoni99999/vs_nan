@@ -256,6 +256,7 @@ Point2f dev_p1,dev_p2,dev_p3,dev_p4;
 vs_based source;
 
 Matrix<float,4,4> Tt2lf,Tt2rg,Tb2lf,Tb2rg;
+Point2f d1,d2,d3,d4,c1,c2,c3,c4;
 
 // 建立回调函数，当ros::spin()被触发时，该函数被激活，处理接收到的消息
 void vs_callback(const vs_nan::vs_message& vs_msg){
@@ -290,6 +291,15 @@ void vs_callback(const vs_nan::vs_message& vs_msg){
 	P2_for_error=Point2f(vs_msg.lf_P2_x_for_error,vs_msg.lf_P2_y_for_error);
 	P3_for_error=Point2f(vs_msg.rg_P3_x_for_error,vs_msg.rg_P3_y_for_error);
 	P4_for_error=Point2f(vs_msg.rg_P4_x_for_error,vs_msg.rg_P4_y_for_error);
+    c1 = P1_for_error;
+	c2 = P2_for_error;
+	c3 = P3_for_error;
+	c4 = P4_for_error;
+	d1 = dev_p1;
+	d2 = dev_p2;
+	d3 = dev_p3;
+	d4 = dev_p4;
+
 }
 Mat depth_left;
 Mat depth_right;
@@ -412,6 +422,7 @@ Tt2rg<<
 		
 		source.lf_P1=source.rebuild3d_new(source.lf_img_pt1,depth_left,640,512,3629.6187,3629.6187);
 		source.lf_P2=source.rebuild3d_new(source.lf_img_pt2,depth_left,640,512,3629.6187,3629.6187);
+
 		source.rg_P3=source.rebuild3d_new(source.rg_img_pt3,depth_right,640,512,3629.6187,3629.6187);
 		source.rg_P4=source.rebuild3d_new(source.rg_img_pt4,depth_right,640,512,3629.6187,3629.6187);
 
@@ -419,7 +430,7 @@ Tt2rg<<
 
 		//将左边点变换到我们认为的末端平面上
 		source.lf_P1 = source.convertR2L(source.lf_P1, Tt2lf.block<3,3>(0,0),source.rt2lf);
-		source.lf_P2 = source.convertR2L(source.lf_P1, Tt2lf.block<3,3>(0,0),source.rt2lf);
+		source.lf_P2 = source.convertR2L(source.lf_P2, Tt2lf.block<3,3>(0,0),source.rt2lf);//...
 		//将右边点变换到我们认为的末端平面上
 		source.rg_P3 = source.convertR2L(source.rg_P3, Tt2rg.block<3,3>(0,0),source.rt2rg);
 		source.rg_P4 = source.convertR2L(source.rg_P4, Tt2rg.block<3,3>(0,0),source.rt2rg);
@@ -450,14 +461,23 @@ Tt2rg<<
 		Point3f rebuild_desiredp3;
 		Point3f rebuild_desiredp4;
 
-		rebuild_desiredp1 = source.rebuild3d_new(Point2f(973.662, 241.07),depth_left,640,512,3629.6187,3629.6187);
-		rebuild_desiredp2 = source.rebuild3d_new(Point2f(973.667, 781.999),depth_left,640,512,3629.6187,3629.6187);
-		rebuild_desiredp3 = source.rebuild3d_new(Point2f(305.331, 781.95),depth_right,640,512,3629.6187,3629.6187);
-		rebuild_desiredp4 = source.rebuild3d_new(Point2f(305.333, 241),depth_right,640,512,3629.6187,3629.6187);
-		rebuild_desiredp1.z = 0.211;
-		rebuild_desiredp2.z = 0.211;
-		rebuild_desiredp3.z = 0.211;
-		rebuild_desiredp4.z = 0.211;
+		// rebuild_desiredp1 = source.rebuild3d_new(Point2f(973.662, 241.07),depth_left,640,512,3629.6187,3629.6187);
+		// rebuild_desiredp2 = source.rebuild3d_new(Point2f(973.667, 781.999),depth_left,640,512,3629.6187,3629.6187);
+		// rebuild_desiredp3 = source.rebuild3d_new(Point2f(305.331, 781.95),depth_right,640,512,3629.6187,3629.6187);
+		// rebuild_desiredp4 = source.rebuild3d_new(Point2f(305.333, 241),depth_right,640,512,3629.6187,3629.6187);
+		rebuild_desiredp1 = source.rebuild3d_new(Point2f(982, 241),depth_left,640,512,3629.6187,3629.6187);
+		rebuild_desiredp2 = source.rebuild3d_new(Point2f(982, 782),depth_left,640,512,3629.6187,3629.6187);
+		rebuild_desiredp3 = source.rebuild3d_new(Point2f(296, 782),depth_right,640,512,3629.6187,3629.6187);
+		rebuild_desiredp4 = source.rebuild3d_new(Point2f(296, 241),depth_right,640,512,3629.6187,3629.6187);
+		cout<<"四个点的深度"<<endl<<depth_left.at<float>(241, 1086);
+		cout<<depth_left.at<float>(782, 1086)<<endl;
+		cout<<depth_left.at<float>(782, 192)<<endl;
+		cout<<depth_left.at<float>(241, 192)<<endl;
+
+		rebuild_desiredp1.z = 0.185;
+		rebuild_desiredp2.z = 0.185;
+		rebuild_desiredp3.z = 0.185;
+		rebuild_desiredp4.z = 0.185;
 		cout<<"期望点的相机坐标系下的重建值："<<endl;
 		cout<<rebuild_desiredp1.x<<" "<<rebuild_desiredp1.y<<" "<<rebuild_desiredp1.z<<endl;
 		cout<<rebuild_desiredp2.x<<" "<<rebuild_desiredp2.y<<" "<<rebuild_desiredp2.z<<endl;
@@ -491,7 +511,12 @@ Tt2rg<<
 		cout<<"[ "<<dev_p3.x<<", "<<dev_p3.y<<"]"<<endl; 
 		cout<<"[ "<<dev_p4.x<<", "<<dev_p4.y<<"]"<<endl; 
 
-		Mat rebuildplane = Mat(1536, 1920, CV_8UC3, Scalar(255,255,255));
+		dev_p1 = Point2f(955,801);
+		dev_p2 = Point2f(955,217);
+		dev_p3 = Point2f(331,217);
+		dev_p4 = Point2f(331,801);
+
+		Mat rebuildplane = Mat(1024, 1280, CV_8UC3, Scalar(255,255,255));
 		circle(rebuildplane, P1_for_error, 15,Scalar(255,0,0),-1);
 		circle(rebuildplane, P2_for_error, 7,Scalar(0,0,255),-1);
 		circle(rebuildplane, P3_for_error, 9,Scalar(0,0,255),-1);
@@ -500,6 +525,8 @@ Tt2rg<<
 		circle(rebuildplane, dev_p2, 7,Scalar(0,255,0),-1);
 		circle(rebuildplane, dev_p3, 9,Scalar(0,255,0),-1);
 		circle(rebuildplane, dev_p4, 11,Scalar(0,255,0),-1);
+
+
 
 		namedWindow("rebuild_image_plane", 0);
 		resizeWindow("rebuild_image_plane", 640, 512);
@@ -579,6 +606,11 @@ Tt2rg<<
 
 		Eigen::Matrix<float,6,1> u;
 		//方法1 386-408
+
+		dev_p1 = Point2f(955,801);
+		dev_p2 = Point2f(955,217);
+		dev_p3 = Point2f(331,217);
+		dev_p4 = Point2f(331,801);
 		Eigen::Matrix<float,8,1>error; 
 		error(0,0)=P3_for_error.x-dev_p3.x;
 		error(1,0)=P3_for_error.y-dev_p3.y;
@@ -588,6 +620,15 @@ Tt2rg<<
 		error(5,0)=P1_for_error.y-dev_p1.y;
 		error(6,0)=P2_for_error.x-dev_p2.x;
 		error(7,0)=P2_for_error.y-dev_p2.y;
+
+		// error(0,0)=c3.x-d3.x;
+		// error(1,0)=c3.y-d3.y;
+		// error(2,0)=c4.x-d4.x;
+		// error(3,0)=c4.y-d4.y;
+		// error(4,0)=c1.x-d1.x;
+		// error(5,0)=c1.y-d1.y;
+		// error(6,0)=c2.x-d2.x;
+		// error(7,0)=c2.y-d2.y;	
 		cout<<"error"<<endl<<error<<endl;
 
 		cout<<P1_for_error.x<<endl;cout<<P1_for_error.y<<endl;cout<<P2_for_error.x<<endl;cout<<P2_for_error.y<<endl;
@@ -606,11 +647,11 @@ Tt2rg<<
 		//cout<<"对角线"<<(Ht*H).diagonal() <<endl;
 		MatrixXf H_Diag((Ht*H).diagonal().asDiagonal());
 		cout<<"HT*T ' DIAG:"<<endl<<H_Diag<<endl;
-		H_Diag=0.3*H_Diag+(Ht*H);
+		H_Diag=0.0*H_Diag+(Ht*H);
 		
 		cout<<"H_pinv"<<H_Diag<<endl;
 		u = -H_Diag.inverse()*Ht*error;
-		u=u/350;
+		u=u/100;
 
 		cout<<"在相机中的工具速度是"<<endl;
 		cout<<u<<endl;
@@ -626,11 +667,12 @@ Tt2rg<<
 		cout<<"转换矩阵为"<<Tb2c<<endl;
 		//cout<<"11"<<endl<<m<<endl;
 		u = Tb2c * u;
+		//u = u/2;
 \
 
-		u(3,0) = 26 * u(3,0);
-		u(4,0) = 26 * u(4,0);
-		u(5,0) = 26 * u(5,0);
+		// u(3,0) = 2 * u(3,0);
+		// u(4,0) = 2 * u(4,0);
+		// u(5,0) = 2 * u(5,0);
 
 		//发送 u
 		cout<<"速度是"<<endl;

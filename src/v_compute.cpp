@@ -243,7 +243,7 @@ Eigen::Matrix<float, 4, 6> vs_based::compute_Hc(float fcx, float fcy, Point3f Pc
 	Eigen::Matrix<float, 6, 6> Wc;
 	Wc = this->comput_W(Rb2c, tb2c);
 	Eigen::Matrix<float, 4, 6> result;
-	//result = J_ba * M_ba * Qc * Wc;
+    //result = J_ba * M_ba * Qc * Wc;
     result = J_ba * M_ba * Qc ;
 	
 	cout<<"jacobian j:"<<endl<<J_ba * M_ba<<endl;
@@ -429,27 +429,27 @@ Tt2rg<<
 
 
 		//将左边点变换到我们认为的末端平面上
-		source.lf_P1 = source.convertR2L(source.lf_P1, Tt2lf.block<3,3>(0,0),source.rt2lf);
-		source.lf_P2 = source.convertR2L(source.lf_P2, Tt2lf.block<3,3>(0,0),source.rt2lf);//...
+		// source.lf_P1 = source.convertR2L(source.lf_P1, Tt2lf.block<3,3>(0,0),source.rt2lf);
+		// source.lf_P2 = source.convertR2L(source.lf_P2, Tt2lf.block<3,3>(0,0),source.rt2lf);//...
 		//将右边点变换到我们认为的末端平面上
-		source.rg_P3 = source.convertR2L(source.rg_P3, Tt2rg.block<3,3>(0,0),source.rt2rg);
-		source.rg_P4 = source.convertR2L(source.rg_P4, Tt2rg.block<3,3>(0,0),source.rt2rg);
+		source.rg_P3 = source.convertR2L(source.rg_P3, source.Rl2r,source.tl2r);
+		source.rg_P4 = source.convertR2L(source.rg_P4, source.Rl2r,source.tl2r);
 
-		cout<<"The result of rebuild in fake end-effector:"<<endl;
+		cout<<"The result of rebuild in left camera:"<<endl;
 		cout<<"lf_P1:"<<source.lf_P1.x<<","<<source.lf_P1.y<<","<<source.lf_P1.z<<endl;
 		cout<<"lf_P2:"<<source.lf_P2.x<<","<<source.lf_P2.y<<","<<source.lf_P2.z<<endl;
 		cout<<"rg_P3:"<<source.rg_P3.x<<","<<source.rg_P3.y<<","<<source.rg_P3.z<<endl;
 		cout<<"rg_P4:"<<source.rg_P4.x<<","<<source.rg_P4.y<<","<<source.rg_P4.z<<endl;
 		//等价的图像pixel点
 
-		Point2f rightPixend1 = source.convertImagePlane(source.lf_P1);
-		Point2f rightPixend2 = source.convertImagePlane(source.lf_P2);
-		P1_for_error = rightPixend1;
-        P2_for_error = rightPixend2;
-		Point2f rightPixend3 = source.convertImagePlane(source.rg_P3);
-		Point2f rightPixend4 = source.convertImagePlane(source.rg_P4);
-		P3_for_error = rightPixend3;
-        P4_for_error = rightPixend4;
+		// Point2f rightPixend1 = source.convertImagePlane(source.lf_P1);
+		// Point2f rightPixend2 = source.convertImagePlane(source.lf_P2);
+		// P1_for_error = rightPixend1;
+        // P2_for_error = rightPixend2;
+		// Point2f rightPixend3 = source.convertImagePlane(source.rg_P3);
+		// Point2f rightPixend4 = source.convertImagePlane(source.rg_P4);
+		// P3_for_error = rightPixend3;
+        // P4_for_error = rightPixend4;
 		cout<<"对应的图像平面点为："<<endl;
 		cout<<"lf_:"<<P1_for_error.x<<","<<P1_for_error.y<<endl;
 		cout<<"lf_:"<<P2_for_error.x<<","<<P2_for_error.y<<endl;
@@ -461,46 +461,43 @@ Tt2rg<<
 		Point3f rebuild_desiredp3;
 		Point3f rebuild_desiredp4;
 
-		// rebuild_desiredp1 = source.rebuild3d_new(Point2f(973.662, 241.07),depth_left,640,512,3629.6187,3629.6187);
-		// rebuild_desiredp2 = source.rebuild3d_new(Point2f(973.667, 781.999),depth_left,640,512,3629.6187,3629.6187);
-		// rebuild_desiredp3 = source.rebuild3d_new(Point2f(305.331, 781.95),depth_right,640,512,3629.6187,3629.6187);
-		// rebuild_desiredp4 = source.rebuild3d_new(Point2f(305.333, 241),depth_right,640,512,3629.6187,3629.6187);
-		rebuild_desiredp1 = source.rebuild3d_new(Point2f(982, 241),depth_left,640,512,3629.6187,3629.6187);
-		rebuild_desiredp2 = source.rebuild3d_new(Point2f(982, 782),depth_left,640,512,3629.6187,3629.6187);
-		rebuild_desiredp3 = source.rebuild3d_new(Point2f(296, 782),depth_right,640,512,3629.6187,3629.6187);
-		rebuild_desiredp4 = source.rebuild3d_new(Point2f(296, 241),depth_right,640,512,3629.6187,3629.6187);
-		cout<<"四个点的深度"<<endl<<depth_left.at<float>(241, 1086);
-		cout<<depth_left.at<float>(782, 1086)<<endl;
-		cout<<depth_left.at<float>(782, 192)<<endl;
-		cout<<depth_left.at<float>(241, 192)<<endl;
 
-		rebuild_desiredp1.z = 0.185;
-		rebuild_desiredp2.z = 0.185;
-		rebuild_desiredp3.z = 0.185;
-		rebuild_desiredp4.z = 0.185;
-		cout<<"期望点的相机坐标系下的重建值："<<endl;
-		cout<<rebuild_desiredp1.x<<" "<<rebuild_desiredp1.y<<" "<<rebuild_desiredp1.z<<endl;
-		cout<<rebuild_desiredp2.x<<" "<<rebuild_desiredp2.y<<" "<<rebuild_desiredp2.z<<endl;
-		cout<<rebuild_desiredp3.x<<" "<<rebuild_desiredp3.y<<" "<<rebuild_desiredp3.z<<endl;
-		cout<<rebuild_desiredp4.x<<" "<<rebuild_desiredp4.y<<" "<<rebuild_desiredp4.z<<endl;
+		// rebuild_desiredp1 = source.rebuild3d_new(Point2f(982, 241),depth_left,640,512,3629.6187,3629.6187);
+		// rebuild_desiredp2 = source.rebuild3d_new(Point2f(982, 782),depth_left,640,512,3629.6187,3629.6187);
+		// rebuild_desiredp3 = source.rebuild3d_new(Point2f(296, 782),depth_right,640,512,3629.6187,3629.6187);
+		// rebuild_desiredp4 = source.rebuild3d_new(Point2f(296, 241),depth_right,640,512,3629.6187,3629.6187);
+		// cout<<"四个点的深度"<<endl<<depth_left.at<float>(241, 1086);
+		// cout<<depth_left.at<float>(782, 1086)<<endl;
+		// cout<<depth_left.at<float>(782, 192)<<endl;
+		// cout<<depth_left.at<float>(241, 192)<<endl;
 
-		rebuild_desiredp1 = source.convertR2L(rebuild_desiredp1, Tt2lf.block<3,3>(0,0),source.rt2lf);
-		rebuild_desiredp2 = source.convertR2L(rebuild_desiredp2, Tt2lf.block<3,3>(0,0),source.rt2lf);	
-		rebuild_desiredp3 = source.convertR2L(rebuild_desiredp3, Tt2rg.block<3,3>(0,0),source.rt2rg);
-		rebuild_desiredp4 = source.convertR2L(rebuild_desiredp4, Tt2rg.block<3,3>(0,0),source.rt2rg);
+		// rebuild_desiredp1.z = 0.185;
+		// rebuild_desiredp2.z = 0.185;
+		// rebuild_desiredp3.z = 0.185;
+		// rebuild_desiredp4.z = 0.185;
+		// cout<<"期望点的相机坐标系下的重建值："<<endl;
+		// cout<<rebuild_desiredp1.x<<" "<<rebuild_desiredp1.y<<" "<<rebuild_desiredp1.z<<endl;
+		// cout<<rebuild_desiredp2.x<<" "<<rebuild_desiredp2.y<<" "<<rebuild_desiredp2.z<<endl;
+		// cout<<rebuild_desiredp3.x<<" "<<rebuild_desiredp3.y<<" "<<rebuild_desiredp3.z<<endl;
+		// cout<<rebuild_desiredp4.x<<" "<<rebuild_desiredp4.y<<" "<<rebuild_desiredp4.z<<endl;
 
-		cout<<"期望点转至末端的重建值："<<endl<<rebuild_desiredp1.x<<" "<<rebuild_desiredp1.y<<" "<<rebuild_desiredp1.z<<endl;
-		cout<<rebuild_desiredp2.x<<" "<<rebuild_desiredp2.y<<" "<<rebuild_desiredp2.z<<endl<<rebuild_desiredp3.x<<" "<<rebuild_desiredp3.y<<" "<<rebuild_desiredp3.z<<endl;
-		cout<<rebuild_desiredp4.x<<" "<<rebuild_desiredp4.y<<" "<<rebuild_desiredp4.z<<endl;
+		// rebuild_desiredp1 = source.convertR2L(rebuild_desiredp1, Tt2lf.block<3,3>(0,0),source.rt2lf);
+		// rebuild_desiredp2 = source.convertR2L(rebuild_desiredp2, Tt2lf.block<3,3>(0,0),source.rt2lf);	
+		// rebuild_desiredp3 = source.convertR2L(rebuild_desiredp3, Tt2rg.block<3,3>(0,0),source.rt2rg);
+		// rebuild_desiredp4 = source.convertR2L(rebuild_desiredp4, Tt2rg.block<3,3>(0,0),source.rt2rg);
 
-		Point2f desiredp1end = source.convertImagePlane(rebuild_desiredp1);
-		Point2f desiredp2end = source.convertImagePlane(rebuild_desiredp2);
-		Point2f desiredp3end = source.convertImagePlane(rebuild_desiredp3);
-		Point2f desiredp4end = source.convertImagePlane(rebuild_desiredp4);
-		dev_p1 = desiredp1end;
-		dev_p2 = desiredp2end;
-		dev_p3 = desiredp3end;
-		dev_p4 = desiredp4end;
+		// cout<<"期望点转至末端的重建值："<<endl<<rebuild_desiredp1.x<<" "<<rebuild_desiredp1.y<<" "<<rebuild_desiredp1.z<<endl;
+		// cout<<rebuild_desiredp2.x<<" "<<rebuild_desiredp2.y<<" "<<rebuild_desiredp2.z<<endl<<rebuild_desiredp3.x<<" "<<rebuild_desiredp3.y<<" "<<rebuild_desiredp3.z<<endl;
+		// cout<<rebuild_desiredp4.x<<" "<<rebuild_desiredp4.y<<" "<<rebuild_desiredp4.z<<endl;
+
+		// Point2f desiredp1end = source.convertImagePlane(rebuild_desiredp1);
+		// Point2f desiredp2end = source.convertImagePlane(rebuild_desiredp2);
+		// Point2f desiredp3end = source.convertImagePlane(rebuild_desiredp3);
+		// Point2f desiredp4end = source.convertImagePlane(rebuild_desiredp4);
+		// dev_p1 = desiredp1end;
+		// dev_p2 = desiredp2end;
+		// dev_p3 = desiredp3end;
+		// dev_p4 = desiredp4end;
 		cout<<"末端图像平面的当前点和期望点"<<endl;
 		cout<<"[ "<<P1_for_error.x<<", "<<P1_for_error.y<<"]"<<endl; 
 		cout<<"[ "<<P2_for_error.x<<", "<<P2_for_error.y<<"]"<<endl; 
@@ -511,27 +508,27 @@ Tt2rg<<
 		cout<<"[ "<<dev_p3.x<<", "<<dev_p3.y<<"]"<<endl; 
 		cout<<"[ "<<dev_p4.x<<", "<<dev_p4.y<<"]"<<endl; 
 
-		dev_p1 = Point2f(955,801);
-		dev_p2 = Point2f(955,217);
-		dev_p3 = Point2f(331,217);
-		dev_p4 = Point2f(331,801);
+		// dev_p1 = Point2f(955,801);
+		// dev_p2 = Point2f(955,217);
+		// dev_p3 = Point2f(331,217);
+		// dev_p4 = Point2f(331,801);
 
-		Mat rebuildplane = Mat(1024, 1280, CV_8UC3, Scalar(255,255,255));
-		circle(rebuildplane, P1_for_error, 15,Scalar(255,0,0),-1);
-		circle(rebuildplane, P2_for_error, 7,Scalar(0,0,255),-1);
-		circle(rebuildplane, P3_for_error, 9,Scalar(0,0,255),-1);
-		circle(rebuildplane, P4_for_error, 11,Scalar(255,0,0),-1);
-		circle(rebuildplane, dev_p1, 15,Scalar(0,255,0),-1);
-		circle(rebuildplane, dev_p2, 7,Scalar(0,255,0),-1);
-		circle(rebuildplane, dev_p3, 9,Scalar(0,255,0),-1);
-		circle(rebuildplane, dev_p4, 11,Scalar(0,255,0),-1);
+		// Mat rebuildplane = Mat(1024, 1280, CV_8UC3, Scalar(255,255,255));
+		// circle(rebuildplane, P1_for_error, 15,Scalar(255,0,0),-1);
+		// circle(rebuildplane, P2_for_error, 7,Scalar(0,0,255),-1);
+		// circle(rebuildplane, P3_for_error, 9,Scalar(0,0,255),-1);
+		// circle(rebuildplane, P4_for_error, 11,Scalar(255,0,0),-1);
+		// circle(rebuildplane, dev_p1, 15,Scalar(0,255,0),-1);
+		// circle(rebuildplane, dev_p2, 7,Scalar(0,255,0),-1);
+		// circle(rebuildplane, dev_p3, 9,Scalar(0,255,0),-1);
+		// circle(rebuildplane, dev_p4, 11,Scalar(0,255,0),-1);
 
 
 
-		namedWindow("rebuild_image_plane", 0);
-		resizeWindow("rebuild_image_plane", 640, 512);
-		imshow("rebuild_image_plane",  rebuildplane);
-		waitKey(25);
+		// namedWindow("rebuild_image_plane", 0);
+		// resizeWindow("rebuild_image_plane", 640, 512);
+		// imshow("rebuild_image_plane",  rebuildplane);
+		//waitKey(25);
 		
 
 		//
@@ -584,7 +581,7 @@ Tt2rg<<
         T_transform.block<3,3>(0,0)=T_rotation.cast<float>();
 
 		// 机械臂读到的 +机械臂的坐标系转换+熟悉的末端到相机
-        Tb2lf=T*T_transform;//*Tt2lf;
+        Tb2lf=T*T_transform*Tt2lf;
         Tb2rg=T*T_transform;//*Tt2rg;
         //cout<< "left pose"<<Tb2lf<<endl;
         //cout<< "right pose"<<Tb2rg<<endl;		
@@ -596,25 +593,26 @@ Tt2rg<<
 
 		
 		//Hr=source.compute_Hc(source.fx_rg,source.fy_rg,source.rg_P3,source.rg_P4,source.rt2rg,source.Rb2rg,source.tb2rg);
-		Hr=source.compute_Hc(source.fx_rg,source.fy_rg,source.rg_P3,source.rg_P4,Eigen::Matrix<float, 3, 1>(0,0,0),source.Rb2lf.transpose(),source.tb2lf);
+		Hr=source.compute_Hc(source.fx_rg,source.fy_rg,source.rg_P3,source.rg_P4,(Tt2lf.inverse()).block<3,1>(0,3),source.Rb2lf.transpose(),source.tb2lf);
 		cout<<"Hr"<<Hr<<endl;
 		Hr=Hr/100;
 		cout<<"H_in left"<<Hr<<endl;
-		Hl=source.compute_Hc(source.fx_lf,source.fy_lf,source.lf_P1,source.lf_P2,Eigen::Matrix<float, 3, 1>(0,0,0),source.Rb2lf.transpose(),source.tb2lf);
+		Hl=source.compute_Hc(source.fx_lf,source.fy_lf,source.lf_P1,source.lf_P2,(Tt2lf.inverse()).block<3,1>(0,3),source.Rb2lf.transpose(),source.tb2lf);
 		Hl=Hl/100;
 
 
 		Eigen::Matrix<float,6,1> u;
 		//方法1 386-408
 
-		dev_p1 = Point2f(955,801);
-		dev_p2 = Point2f(955,217);
-		dev_p3 = Point2f(331,217);
-		dev_p4 = Point2f(331,801);
+		// dev_p1 = Point2f(955,801);
+		// dev_p2 = Point2f(955,217);
+		// dev_p3 = Point2f(331,217);
+		// dev_p4 = Point2f(331,801);
 		Eigen::Matrix<float,8,1>error; 
-		error(0,0)=P3_for_error.x-dev_p3.x;
+		float k=0.8;
+		error(0,0)=-k*(P3_for_error.x-dev_p3.x);
 		error(1,0)=P3_for_error.y-dev_p3.y;
-		error(2,0)=P4_for_error.x-dev_p4.x;
+		error(2,0)=-k*(P4_for_error.x-dev_p4.x);
 		error(3,0)=P4_for_error.y-dev_p4.y;
 		error(4,0)=P1_for_error.x-dev_p1.x;
 		error(5,0)=P1_for_error.y-dev_p1.y;
@@ -649,7 +647,8 @@ Tt2rg<<
 		cout<<"HT*T ' DIAG:"<<endl<<H_Diag<<endl;
 		H_Diag=0.0*H_Diag+(Ht*H);
 		
-		cout<<"H_pinv"<<H_Diag<<endl;
+		cout<<"H_p"<<endl<<H_Diag<<endl;
+		cout<<"H_pinv"<<endl<<H_Diag.inverse();
 		u = -H_Diag.inverse()*Ht*error;
 		u=u/100;
 

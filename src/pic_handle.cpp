@@ -428,6 +428,10 @@ int main(int argc, char **argv)
             vs_msg.rg_line2[0]=pt2_line[0];
             vs_msg.rg_line2[1]=pt2_line[1];
             vs_msg.rg_line2[2]=pt2_line[2];
+            target0 =Point2f(1010,238);
+            target1 =Point2f(1010,784);
+            target2 =Point2f(268,784);
+            target3 =Point2f(268,238);
         
             vs_msg.target_lf_P1_x=target0.x;
             vs_msg.target_lf_P1_y=target0.y;

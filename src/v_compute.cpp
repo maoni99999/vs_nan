@@ -227,7 +227,7 @@ Eigen::Matrix<float, 6, 6> vs_based::comput_W(Eigen::Matrix<float, 3, 3> Rb2c, E
 	result.setZero();
 	result.block<3, 3>(0, 0) = Rb2c;
 	result.block<3, 3>(3, 3) = Rb2c;
-	result.block<3, 3>(0, 3) = Rb2c*sk(rt2c_v);
+	//result.block<3, 3>(0, 3) = -Rb2c*sk(rt2c_v);
 	return result;
 }
 
@@ -557,7 +557,7 @@ Tt2rg<<
 
 		Eigen::Quaterniond quaternion(current_pose.orientation.w,current_pose.orientation.x,current_pose.orientation.y,current_pose.orientation.z);
         Eigen::Vector3d eulerAngle=quaternion.matrix().eulerAngles(2,1,0);//zyx
-        //cout<<"eular angle"<< eulerAngle<<endl;
+        cout<<"eular angle"<< eulerAngle<<endl;
         Eigen::Matrix3d rotation_matrix;
         rotation_matrix=quaternion.matrix();
         Eigen::Vector3f t;
@@ -611,9 +611,9 @@ Tt2rg<<
 		Eigen::Matrix<float,8,1>error; 
 		float k=0.8;
 		error(0,0)=-k*(P3_for_error.x-dev_p3.x);
-		error(1,0)=P3_for_error.y-dev_p3.y;
+		error(1,0)=k*(P3_for_error.y-dev_p3.y);
 		error(2,0)=-k*(P4_for_error.x-dev_p4.x);
-		error(3,0)=P4_for_error.y-dev_p4.y;
+		error(3,0)=k *(P4_for_error.y-dev_p4.y);
 		error(4,0)=P1_for_error.x-dev_p1.x;
 		error(5,0)=P1_for_error.y-dev_p1.y;
 		error(6,0)=P2_for_error.x-dev_p2.x;
@@ -650,6 +650,7 @@ Tt2rg<<
 		cout<<"H_p"<<endl<<H_Diag<<endl;
 		cout<<"H_pinv"<<endl<<H_Diag.inverse();
 		u = -H_Diag.inverse()*Ht*error;
+		cout<<"H_pinv__"<<endl<<H_Diag.inverse()*Ht<<endl;
 		u=u/100;
 
 		cout<<"在相机中的工具速度是"<<endl;
@@ -666,11 +667,13 @@ Tt2rg<<
 		cout<<"转换矩阵为"<<Tb2c<<endl;
 		//cout<<"11"<<endl<<m<<endl;
 		u = Tb2c * u;
-		//u = u/2;
+		u = u/2;
+
+		cout<<"the current end-effector's eular angle"<< endl<<eulerAngle<<endl;
 \
 
-		// u(3,0) = 2 * u(3,0);
-		// u(4,0) = 2 * u(4,0);
+		// u(3,0) =  u(3,0);
+		// u(4,0) =  u(4,0);
 		// u(5,0) = 2 * u(5,0);
 
 		//发送 u
